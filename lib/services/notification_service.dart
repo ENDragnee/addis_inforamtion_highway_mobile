@@ -1,4 +1,3 @@
-import 'package:flutter/material.dart';
 
 // This is a placeholder service. A real implementation would use a package
 // like firebase_messaging to get a device token and handle incoming messages.

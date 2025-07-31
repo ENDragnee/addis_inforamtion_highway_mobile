@@ -1,5 +1,4 @@
 import 'dart:convert';
-import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_appauth/flutter_appauth.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
@@ -54,7 +53,7 @@ class AuthService extends ChangeNotifier {
   // Full OIDC login flow
   Future<void> login() async {
     try {
-      final AuthorizationTokenResponse? result = await _appAuth.authorizeAndExchangeCode(
+      final AuthorizationTokenResponse result = await _appAuth.authorizeAndExchangeCode(
         AuthorizationTokenRequest(
           _clientId, _mobileRedirectUrl,
           serviceConfiguration: AuthorizationServiceConfiguration(
@@ -65,8 +64,8 @@ class AuthService extends ChangeNotifier {
         ),
       );
 
-      if (result?.idToken != null) {
-        await _verifyTokenWithBackend(result!.idToken!);
+      if (result.idToken != null) {
+        await _verifyTokenWithBackend(result.idToken!);
       } else {
         throw Exception('OIDC login cancelled.');
       }
