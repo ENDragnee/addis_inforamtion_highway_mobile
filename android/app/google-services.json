@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "972120897822",
+    "project_id": "addis-inforamtion-highway",
+    "storage_bucket": "addis-inforamtion-highway.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:972120897822:android:74e5290ad619e61c8a710f",
+        "android_client_info": {
+          "package_name": "com.example.addis_inforamtion_highway_mobile"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDRC3jsntlmSDL4ImC1xziD-My3pODrIeA"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:972120897822:android:d4ab6af25b357dcd8a710f",
+        "android_client_info": {
+          "package_name": "com.example.addis_information_highway_mobile"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDRC3jsntlmSDL4ImC1xziD-My3pODrIeA"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

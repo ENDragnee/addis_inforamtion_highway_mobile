@@ -1,6 +1,6 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <application
-        android:label="addis_inforamtion_highway_mobile"
+        android:label="addis_information_highway_mobile"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity

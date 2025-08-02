@@ -1,6 +1,6 @@
 {
-    "name": "addis_inforamtion_highway_mobile",
-    "short_name": "addis_inforamtion_highway_mobile",
+    "name": "addis_information_highway_mobile",
+    "short_name": "addis_information_highway_mobile",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",

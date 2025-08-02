@@ -15,6 +15,19 @@ class ApiService {
     _dio.interceptors.add(AuthInterceptor(_authService, _dio));
   }
 
+  Future<void> registerPushToken(String token) async {
+    try {
+      await _dio.post(
+        '$_baseUrl/api/mobile/users/register-push-token',
+        data: {'token': token},
+      );
+      print('Push token registered successfully with backend.');
+    } on DioException catch (e) {
+      // Don't throw a fatal error, just log it.
+      print('Failed to register push token: ${_handleDioError(e, "Unknown error")}');
+    }
+  }
+
   /// Fetches all data requests (pending and historical) for the logged-in user.
   Future<List<DataRequest>> fetchDataRequests() async {
     try {
@@ -36,9 +49,6 @@ class ApiService {
       if (action == 'APPROVE') {
         // Delegate the complex and secure task of signing to the AuthService
         consentToken = await _authService.signConsentToken(requestId);
-        if (consentToken == null) {
-          throw Exception('Failed to generate consent token. Private key may be missing.');
-        }
       }
 
       final response = await _dio.post(
@@ -95,4 +105,6 @@ class AuthInterceptor extends Interceptor {
     }
     return handler.next(err);
   }
+
+
 }

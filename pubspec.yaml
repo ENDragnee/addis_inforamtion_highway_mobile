@@ -51,6 +51,8 @@ dependencies:
   provider: ^6.1.5
   shared_preferences: ^2.5.3
   lucide_icons_flutter: ^3.0.7
+  firebase_core: ^4.0.0
+  firebase_messaging: ^16.0.0
 dev_dependencies:
   flutter_test:
     sdk: flutter
@@ -66,7 +68,6 @@ dev_dependencies:
 # following page: https://dart.dev/tools/pub/pubspec
 
 # The following section is specific to Flutter packages.
-  addis_inforamtion_highway_mobile: any
 flutter:
 
   # The following line ensures that the Material Icons font is
