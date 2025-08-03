@@ -11,16 +11,20 @@ import 'package:addis_information_highway_mobile/features/auth/login_screen.dart
 import 'package:addis_information_highway_mobile/features/auth/splash_screen.dart';
 import 'package:addis_information_highway_mobile/features/dashboard/dashboard_screen.dart';
 import 'package:addis_information_highway_mobile/features/requests/request_detail_screen.dart';
-
+import 'package:firebase_core/firebase_core.dart';
 // --- Service Imports ---
 import 'package:addis_information_highway_mobile/services/api_service.dart';
 import 'package:addis_information_highway_mobile/services/auth_service.dart';
 import 'package:addis_information_highway_mobile/services/notification_service.dart';
+import 'package:addis_information_highway_mobile/firebase_options.dart';
 
 final GlobalKey<NavigatorState> _navigatorKey = GlobalKey<NavigatorState>();
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
   await dotenv.load(fileName: ".env");
 
   runApp(
