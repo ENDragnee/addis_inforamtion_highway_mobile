@@ -1,7 +1,10 @@
+import 'dart:async';
 import 'package:addis_information_highway_mobile/services/auth_service.dart';
 import 'package:addis_information_highway_mobile/theme/dracula_theme.dart';
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -16,6 +19,9 @@ class _SplashScreenState extends State<SplashScreen>
   late Animation<double> _fadeAnimation;
   late Animation<Offset> _slideAnimation;
 
+  // A timer to handle the 5-second fallback redirect.
+  Timer? _redirectTimer;
+
   @override
   void initState() {
     super.initState();
@@ -26,7 +32,6 @@ class _SplashScreenState extends State<SplashScreen>
       duration: const Duration(milliseconds: 1200),
     );
 
-    // Define a fade-in animation
     _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
       CurvedAnimation(
         parent: _animationController,
@@ -34,7 +39,6 @@ class _SplashScreenState extends State<SplashScreen>
       ),
     );
 
-    // Define a slide-up animation
     _slideAnimation = Tween<Offset>(
       begin: const Offset(0, 0.2),
       end: Offset.zero,
@@ -47,20 +51,39 @@ class _SplashScreenState extends State<SplashScreen>
 
     // Start the animations
     _animationController.forward();
+
+    // --- NEW LOGIC: Start the 5-second timer ---
+    _startRedirectTimer();
+  }
+
+  void _startRedirectTimer() {
+    // This timer will fire after 5 seconds.
+    _redirectTimer = Timer(const Duration(seconds: 5), () {
+      // Check if the widget is still in the widget tree before navigating.
+      if (mounted) {
+        print("Splash Screen: 5-second timeout reached. Forcing navigation to /login.");
+        // Use GoRouter to navigate to the login screen.
+        // The router's redirect logic will still run, but this ensures
+        // we leave the splash screen if the auth state is stuck on 'unknown'.
+        context.go('/login');
+      }
+    });
   }
 
   @override
   void dispose() {
+    // It's crucial to cancel the timer to prevent memory leaks if the
+    // user navigates away before the 5 seconds are up.
+    _redirectTimer?.cancel();
     _animationController.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    // This line is crucial. It tells the widget to listen for changes in the
-    // AuthService. When the auth state changes (e.g., from 'unknown' to
-    // 'unauthenticated'), the GoRouter's redirect logic will fire and
-    // navigate away from this screen automatically.
+    // This line is still important. If the AuthService finishes its check
+    // *before* the 5-second timer, the GoRouter's redirect logic will
+    // navigate away immediately, and the timer will be cancelled in dispose().
     context.watch<AuthService>();
 
     final textTheme = Theme.of(context).textTheme;
@@ -70,10 +93,8 @@ class _SplashScreenState extends State<SplashScreen>
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            // Using a Spacer to push the main content up from the center
             const Spacer(flex: 2),
 
-            // The animated content block
             FadeTransition(
               opacity: _fadeAnimation,
               child: SlideTransition(
@@ -81,7 +102,7 @@ class _SplashScreenState extends State<SplashScreen>
                 child: Column(
                   children: [
                     const Icon(
-                      Icons.gite_rounded,
+                      LucideIcons.house, // Corrected the icon name
                       size: 100,
                       color: draculaPurple,
                     ),
@@ -106,7 +127,6 @@ class _SplashScreenState extends State<SplashScreen>
             ),
             const SizedBox(height: 80),
 
-            // A delayed progress indicator that fades in after the main animation
             FadeTransition(
               opacity: CurvedAnimation(
                 parent: _animationController,
@@ -118,10 +138,8 @@ class _SplashScreenState extends State<SplashScreen>
               ),
             ),
 
-            // Using another Spacer to push the footer to the bottom
             const Spacer(flex: 3),
 
-            // Footer
             Padding(
               padding: const EdgeInsets.only(bottom: 32.0),
               child: FadeTransition(

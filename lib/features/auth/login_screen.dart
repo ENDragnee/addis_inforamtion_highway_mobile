@@ -1,4 +1,3 @@
-import 'dart:async';
 import 'package:addis_information_highway_mobile/services/auth_service.dart';
 import 'package:addis_information_highway_mobile/theme/dracula_theme.dart';
 import 'package:flutter/material.dart';
@@ -59,9 +58,13 @@ class _LoginScreenState extends State<LoginScreen>
     });
 
     try {
-      // The actual logic is now cleanly handled by the AuthService
+      // The actual logic is now cleanly handled by the AuthService.
+      // This single call will handle the OIDC flow, token exchange,
+      // and new device key registration if needed.
       await context.read<AuthService>().login();
-      // GoRouter's redirect logic will handle navigation automatically on success
+
+      // GoRouter's redirect logic will handle navigation automatically on success,
+      // as the authState will change to 'authenticated'.
     } catch (e) {
       // Show an error message if the login process fails
       if (mounted) {
@@ -88,17 +91,14 @@ class _LoginScreenState extends State<LoginScreen>
 
   @override
   Widget build(BuildContext context) {
-    // Getting theme data once for cleaner access
     final textTheme = Theme.of(context).textTheme;
-    final size = MediaQuery.of(context).size;
 
     return Scaffold(
-      // The background color is already set by the global theme
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
             child: Container(
-              constraints: const BoxConstraints(maxWidth: 400), // Ensures content looks good on tablets
+              constraints: const BoxConstraints(maxWidth: 400),
               padding: const EdgeInsets.all(32.0),
               child: FadeTransition(
                 opacity: _fadeAnimation,
@@ -147,7 +147,7 @@ class _LoginScreenState extends State<LoginScreen>
                         )
                             : const Icon(Icons.lock_open_rounded, size: 20),
                         label: Text(
-                          _isLoading ? 'Redirecting...' : 'Sign In with VeriFayda',
+                          _isLoading ? 'Connecting...' : 'Sign In with VeriFayda',
                           style: textTheme.labelLarge?.copyWith(fontSize: 16),
                         ),
                         style: ButtonStyle(

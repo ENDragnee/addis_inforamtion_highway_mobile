@@ -1,2 +1,0 @@
-package com.example.addis_information_highway_mobile
-
