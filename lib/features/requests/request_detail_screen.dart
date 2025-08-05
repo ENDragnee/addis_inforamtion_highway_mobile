@@ -4,14 +4,11 @@ import 'package:addis_information_highway_mobile/theme/dracula_theme.dart';
 import 'package:addis_information_highway_mobile/features/dashboard/dashboard_content.dart'; // For StatusBadge
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:provider/provider.dart';
-import  'package:lucide_icons_flutter/lucide_icons.dart';
-
-
 
 class RequestDetailScreen extends StatefulWidget {
   final String requestId;
-  // initialData is an optimization to avoid re-fetching when navigating from a list.
   final Map<String, dynamic>? initialData;
 
   const RequestDetailScreen({
@@ -25,38 +22,29 @@ class RequestDetailScreen extends StatefulWidget {
 }
 
 class _RequestDetailScreenState extends State<RequestDetailScreen> {
-  // Use a Future to manage the state of the data fetching.
   late Future<DataRequest> _requestFuture;
-  bool _isResponding = false; // Separate loading state for the action buttons
+  bool _isResponding = false;
 
   @override
   void initState() {
     super.initState();
-    // Decide whether to use the pre-loaded data or fetch it.
     if (widget.initialData != null) {
-      // If data is already available, create a completed Future instantly.
       _requestFuture = Future.value(DataRequest.fromJson(widget.initialData!));
     } else {
-      // If navigating directly to this screen (e.g., from a push notification),
-      // fetch the data from the API.
       _requestFuture = _fetchRequestDetails();
     }
   }
 
-  /// Fetches the details for a single request. This is the fallback.
   Future<DataRequest> _fetchRequestDetails() async {
     try {
       final allRequests = await context.read<ApiService>().fetchDataRequests();
-      // Find the specific request by its ID from the full list.
       return allRequests.firstWhere((req) => req.id == widget.requestId,
           orElse: () => throw Exception('Request with ID ${widget.requestId} not found.'));
     } catch (e) {
-      // Propagate the error to be handled by the FutureBuilder.
       throw Exception('Failed to load request details.');
     }
   }
 
-  /// Handles the user's response (Approve/Deny) to the request.
   Future<void> _handleResponse(String action) async {
     setState(() => _isResponding = true);
     try {
@@ -69,10 +57,10 @@ class _RequestDetailScreenState extends State<RequestDetailScreen> {
           SnackBar(
             content: Text(message),
             backgroundColor: draculaGreen,
+            behavior: SnackBarBehavior.floating,
           ),
         );
-        // Go back to the dashboard after a successful response.
-        context.pop();
+        context.pop(); // Go back to the previous screen (Dashboard/History)
       }
     } catch (e) {
       if (mounted) {
@@ -80,6 +68,7 @@ class _RequestDetailScreenState extends State<RequestDetailScreen> {
           SnackBar(
             content: Text(e.toString()),
             backgroundColor: draculaRed,
+            behavior: SnackBarBehavior.floating,
           ),
         );
       }
@@ -91,7 +80,18 @@ class _RequestDetailScreenState extends State<RequestDetailScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Request Details')),
+      appBar: AppBar(
+        title: const Text('Request Details'),
+        // --- NEW: Home button added to the AppBar ---
+        actions: [
+          IconButton(
+            icon: const Icon(LucideIcons.house),
+            tooltip: 'Go to Dashboard',
+            onPressed: () => context.go('/dashboard'),
+          ),
+          const SizedBox(width: 8),
+        ],
+      ),
       body: FutureBuilder<DataRequest>(
         future: _requestFuture,
         builder: (context, snapshot) {
@@ -113,12 +113,12 @@ class _RequestDetailScreenState extends State<RequestDetailScreen> {
     final isActionable = request.status == 'AWAITING_CONSENT';
 
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(24.0),
+      padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 16.0), // Reduced vertical padding
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const Center(
-            child: Icon(LucideIcons.shieldCheck, size: 80, color: draculaPurple),
+          Center(
+            child: Icon(LucideIcons.shieldCheck, size: 64, color: draculaPurple), // Smaller icon
           ),
           const SizedBox(height: 16),
           Center(
@@ -131,17 +131,15 @@ class _RequestDetailScreenState extends State<RequestDetailScreen> {
           Center(
             child: StatusBadge(status: request.status),
           ),
-          const SizedBox(height: 32),
+          const SizedBox(height: 24), // Reduced spacing
           const Text(
             'A data sharing request has been made:',
             style: TextStyle(color: draculaComment),
           ),
           const SizedBox(height: 16),
-
-          // Added a Card for better visual grouping of details.
           Card(
             child: Padding(
-              padding: const EdgeInsets.all(16.0),
+              padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
               child: Column(
                 children: [
                   _buildDetailRow(
@@ -166,12 +164,15 @@ class _RequestDetailScreenState extends State<RequestDetailScreen> {
               ),
             ),
           ),
-          const SizedBox(height: 48),
+          const SizedBox(height: 32), // Reduced spacing
 
-          if (isActionable)
-            _buildActionButtons()
-          else
-            _buildGoBackButton(), // Show the "Go Back" button for historical items
+          // Use an AnimatedSwitcher for a smooth transition between button states
+          AnimatedSwitcher(
+            duration: const Duration(milliseconds: 300),
+            child: isActionable
+                ? _buildActionButtons()
+                : _buildNonActionableMessage(), // Show the info message for historical items
+          ),
         ],
       ),
     );
@@ -187,7 +188,6 @@ class _RequestDetailScreenState extends State<RequestDetailScreen> {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 12.0),
       child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Icon(icon, color: draculaComment, size: 20),
           const SizedBox(width: 16),
@@ -197,12 +197,17 @@ class _RequestDetailScreenState extends State<RequestDetailScreen> {
               children: [
                 Text(label, style: const TextStyle(color: draculaComment, fontSize: 12)),
                 const SizedBox(height: 4),
-                Text(
-                  value,
-                  style: TextStyle(
-                    color: valueColor ?? draculaForeground,
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
+                // AnimatedSwitcher provides a nice fade when data changes
+                AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 300),
+                  child: Text(
+                    value,
+                    key: ValueKey<String>(value), // Important for the animation to trigger
+                    style: TextStyle(
+                      color: valueColor ?? draculaForeground,
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                 ),
               ],
@@ -225,48 +230,36 @@ class _RequestDetailScreenState extends State<RequestDetailScreen> {
           icon: const Icon(LucideIcons.check),
           label: const Text('Approve'),
           style: ButtonStyle(
-            backgroundColor: WidgetStateProperty.all(draculaGreen),
             padding: WidgetStateProperty.all<EdgeInsets>(const EdgeInsets.symmetric(vertical: 16)),
+            backgroundColor: WidgetStateProperty.all(draculaGreen),
           ),
         ),
         const SizedBox(height: 12),
-        ElevatedButton.icon(
+        OutlinedButton.icon( // Use OutlinedButton for a secondary action
           onPressed: () => _handleResponse('DENY'),
           icon: const Icon(LucideIcons.x),
           label: const Text('Deny'),
-          style: ButtonStyle(
-            backgroundColor: WidgetStateProperty.all(draculaRed),
-            padding: WidgetStateProperty.all<EdgeInsets>(const EdgeInsets.symmetric(vertical: 16)),
+          style: OutlinedButton.styleFrom(
+            foregroundColor: draculaRed,
+            side: const BorderSide(color: draculaRed),
+            padding: const EdgeInsets.symmetric(vertical: 16),
           ),
         ),
       ],
     );
   }
 
-  /// NEW WIDGET: A button for navigating back to the home/dashboard screen.
-  Widget _buildGoBackButton() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Center(
-          child: Text(
-            'This request has been actioned and is no longer pending.',
-            textAlign: TextAlign.center,
-            style: TextStyle(color: draculaComment, fontStyle: FontStyle.italic),
-          ),
+  /// NEW WIDGET: A simple text message for historical requests.
+  Widget _buildNonActionableMessage() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 16.0),
+        child: Text(
+          'This request has been actioned and is no longer pending.',
+          textAlign: TextAlign.center,
+          style: TextStyle(color: draculaComment, fontStyle: FontStyle.italic),
         ),
-        const SizedBox(height: 24),
-        OutlinedButton.icon(
-          onPressed: () => context.go('/dashboard'), // Navigate to the main dashboard route
-          icon: const Icon(LucideIcons.house),
-          label: const Text('Go Back to Home'),
-          style: OutlinedButton.styleFrom(
-            foregroundColor: draculaComment,
-            side: const BorderSide(color: draculaCurrentLine),
-            padding: const EdgeInsets.symmetric(vertical: 16),
-          ),
-        )
-      ],
+      ),
     );
   }
 
@@ -292,27 +285,20 @@ class _RequestDetailScreenState extends State<RequestDetailScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(Icons.error_outline, color: draculaRed, size: 60),
+            const Icon(LucideIcons.serverCrash, color: draculaRed, size: 60),
             const SizedBox(height: 16),
-            const Text(
-              'Failed to Load Request',
-              style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
-              textAlign: TextAlign.center,
-            ),
+            const Text('Failed to Load Request', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold), textAlign: TextAlign.center),
             const SizedBox(height: 8),
-            Text(
-              error,
-              style: const TextStyle(color: draculaComment),
-              textAlign: TextAlign.center,
-            ),
+            Text(error, style: const TextStyle(color: draculaComment), textAlign: TextAlign.center),
             const SizedBox(height: 24),
-            ElevatedButton(
+            ElevatedButton.icon(
               onPressed: () {
                 setState(() {
                   _requestFuture = _fetchRequestDetails();
                 });
               },
-              child: const Text('Try Again'),
+              icon: const Icon(LucideIcons.refreshCw),
+              label: const Text('Try Again'),
             ),
           ],
         ),

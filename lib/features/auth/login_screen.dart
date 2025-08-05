@@ -2,9 +2,8 @@ import 'package:addis_information_highway_mobile/services/auth_service.dart';
 import 'package:addis_information_highway_mobile/theme/dracula_theme.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:dio/dio.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
+import 'package:addis_information_highway_mobile/services/test_user_service.dart'; // IMPORT
 
 // A simple model for the test user data fetched from the backend.
 class TestUser {
@@ -39,11 +38,8 @@ class LoginScreen extends StatefulWidget {
 
 class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStateMixin {
   bool _isLoadingOidc = false;
-  // State for the test user feature
-  bool _isLoadingTestUsers = true; // Start in a loading state
-  List<TestUser> _testUsers = [];
-  String? _testUserError;
 
+  // State for the animation
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
 
@@ -59,28 +55,6 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
         .animate(CurvedAnimation(parent: _animationController, curve: Curves.easeIn));
 
     _animationController.forward();
-
-    // REMOVED kDebugMode CHECK: Always fetch the test users.
-    _fetchTestUsers();
-  }
-
-  Future<void> _fetchTestUsers() async {
-    try {
-      final dio = Dio();
-      final response = await dio.get(
-          '${dotenv.env['BFF_BASE_URL']!}/api/v1/mobile/debug/test-users');
-      if (response.statusCode == 200) {
-        final users = (response.data as List)
-            .map((json) => TestUser.fromJson(json))
-            .toList();
-        setState(() => _testUsers = users);
-      }
-    } catch (e) {
-      setState(() => _testUserError = 'Failed to load test users.');
-      print('Error fetching test users: $e');
-    } finally {
-      setState(() => _isLoadingTestUsers = false);
-    }
   }
 
   @override
@@ -106,8 +80,6 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
   }
 
   Future<void> _handleTestUserLogin(TestUser user) async {
-    // We can add a loading state for the specific tile if desired,
-    // but for quick testing, a direct call is often fine.
     await context.read<AuthService>().debugLogin(
       sessionToken: user.sessionToken,
       needsFcmTokenSetup: user.needsFcmTokenSetup,
@@ -117,6 +89,9 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
+
+    // Listen to the TestUserService to rebuild when its data changes
+    final testUserService = context.watch<TestUserService>();
 
     return Scaffold(
       body: SafeArea(
@@ -129,49 +104,37 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
                 constraints: const BoxConstraints(maxWidth: 450),
                 child: Card(
                   elevation: 8,
-                  shadowColor: Colors.black.withAlpha(20), // Use withOpacity for consistency
+                  shadowColor: Colors.black.withAlpha(20),
                   child: Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 32.0),
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        // --- Header ---
                         const Icon(LucideIcons.shieldCheck, size: 48, color: draculaPurple),
                         const SizedBox(height: 16),
-                        Text(
-                          'Choose an account',
-                          style: textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
-                        ),
+                        Text('Choose an account', style: textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold)),
                         const SizedBox(height: 8),
-                        Text(
-                          'to continue to Addis Information Highway',
-                          style: textTheme.bodyMedium?.copyWith(color: draculaComment),
-                        ),
+                        Text('to continue to Addis Information Highway', style: textTheme.bodyMedium?.copyWith(color: draculaComment)),
                         const SizedBox(height: 24),
                         const Divider(color: draculaCurrentLine),
 
-                        // --- Test User List (Now always visible) ---
-                        // REMOVED kDebugMode CHECK: This section will now always build.
-                        _buildTestUserSection(),
+                        // Pass the state from the service to the build method
+                        _buildTestUserSection(
+                          isLoading: testUserService.isLoading,
+                          error: testUserService.error,
+                          testUsers: testUserService.testUsers,
+                        ),
 
-                        // --- Main Login Action ---
                         ListTile(
                           contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
                           leading: _isLoadingOidc
-                              ? const SizedBox(
-                            width: 40,
-                            height: 40,
-                            child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
-                          )
-                              : const CircleAvatar(
-                            backgroundColor: draculaCurrentLine,
-                            child: Icon(LucideIcons.keyRound, color: draculaCyan),
-                          ),
+                              ? const SizedBox(width: 40, height: 40, child: Center(child: CircularProgressIndicator(strokeWidth: 2)))
+                              : const CircleAvatar(backgroundColor: draculaCurrentLine, child: Icon(LucideIcons.keyRound, color: draculaCyan)),
                           title: Text('Sign In with VeriFayda', style: textTheme.titleMedium),
                           subtitle: Text('Use the official secure login', style: textTheme.bodySmall),
                           onTap: _isLoadingOidc ? null : _handleOidcLogin,
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                          hoverColor: draculaPink.withAlpha(10), // Use withOpacity for consistency
+                          hoverColor: draculaPink.withAlpha(10),
                         ),
                       ],
                     ),
@@ -185,41 +148,36 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
     );
   }
 
-  /// A helper widget to build the test user section, keeping the main build method clean.
-  Widget _buildTestUserSection() {
-    if (_isLoadingTestUsers) {
+  Widget _buildTestUserSection({
+    required bool isLoading,
+    required String? error,
+    required List<TestUser> testUsers,
+  }) {
+    if (isLoading) {
       return const Padding(
         padding: EdgeInsets.symmetric(vertical: 40.0),
         child: Center(child: CircularProgressIndicator(color: draculaComment)),
       );
     }
-    if (_testUserError != null) {
+    if (error != null) {
       return Padding(
         padding: const EdgeInsets.all(16.0),
-        child: Text(_testUserError!, style: const TextStyle(color: draculaRed), textAlign: TextAlign.center),
+        child: Text(error, style: const TextStyle(color: draculaRed), textAlign: TextAlign.center),
       );
     }
-    if (_testUsers.isEmpty) {
-      // Show an informative message instead of nothing.
-      return const Padding(
-        padding: EdgeInsets.symmetric(vertical: 24.0),
-        child: Center(child: Text("No test users found.", style: TextStyle(color: draculaComment))),
-      );
+    if (testUsers.isEmpty) {
+      return const SizedBox.shrink();
     }
 
-    // Use ListView.separated for clean dividers
     return ListView.separated(
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
-      itemCount: _testUsers.length,
+      itemCount: testUsers.length,
       itemBuilder: (context, index) {
-        final user = _testUsers[index];
+        final user = testUsers[index];
         return ListTile(
           contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-          leading: const CircleAvatar(
-            backgroundColor: draculaCurrentLine,
-            child: Icon(LucideIcons.user, color: draculaComment),
-          ),
+          leading: const CircleAvatar(backgroundColor: draculaCurrentLine, child: Icon(LucideIcons.user, color: draculaComment)),
           title: Text(user.name, style: Theme.of(context).textTheme.titleMedium),
           subtitle: Text('Test Account', style: Theme.of(context).textTheme.bodySmall),
           onTap: () => _handleTestUserLogin(user),

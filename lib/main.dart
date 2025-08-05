@@ -17,6 +17,7 @@ import 'package:addis_information_highway_mobile/services/api_service.dart';
 import 'package:addis_information_highway_mobile/services/auth_service.dart';
 import 'package:addis_information_highway_mobile/services/notification_service.dart';
 import 'package:addis_information_highway_mobile/firebase_options.dart';
+import 'package:addis_information_highway_mobile/services/test_user_service.dart'; // IMPORT the new service
 
 final GlobalKey<NavigatorState> _navigatorKey = GlobalKey<NavigatorState>();
 
@@ -31,6 +32,7 @@ Future<void> main() async {
     MultiProvider(
       providers: [
         ChangeNotifierProvider(create: (_) => AuthService()),
+        ChangeNotifierProvider(create: (_) => TestUserService()),
         ProxyProvider<AuthService, ApiService>(
           update: (_, authService, __) => ApiService(authService),
         ),

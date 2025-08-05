@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:addis_information_highway_mobile/services/auth_service.dart';
+import 'package:addis_information_highway_mobile/services/test_user_service.dart';
 import 'package:addis_information_highway_mobile/theme/dracula_theme.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
@@ -19,14 +20,17 @@ class _SplashScreenState extends State<SplashScreen>
   late Animation<double> _fadeAnimation;
   late Animation<Offset> _slideAnimation;
 
-  // A timer to handle the 5-second fallback redirect.
   Timer? _redirectTimer;
 
   @override
   void initState() {
     super.initState();
 
-    // Setup the controller for our entry animation
+    // --- NEW LOGIC: Trigger the test user fetch ---
+    // We use `context.read` because we only want to call this method once
+    // and don't need to rebuild the splash screen when the data arrives.
+    context.read<TestUserService>().fetchTestUsers();
+
     _animationController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 1200),
@@ -49,22 +53,14 @@ class _SplashScreenState extends State<SplashScreen>
       ),
     );
 
-    // Start the animations
     _animationController.forward();
-
-    // --- NEW LOGIC: Start the 5-second timer ---
     _startRedirectTimer();
   }
 
   void _startRedirectTimer() {
-    // This timer will fire after 5 seconds.
     _redirectTimer = Timer(const Duration(seconds: 5), () {
-      // Check if the widget is still in the widget tree before navigating.
       if (mounted) {
         print("Splash Screen: 5-second timeout reached. Forcing navigation to /login.");
-        // Use GoRouter to navigate to the login screen.
-        // The router's redirect logic will still run, but this ensures
-        // we leave the splash screen if the auth state is stuck on 'unknown'.
         context.go('/login');
       }
     });
@@ -72,8 +68,6 @@ class _SplashScreenState extends State<SplashScreen>
 
   @override
   void dispose() {
-    // It's crucial to cancel the timer to prevent memory leaks if the
-    // user navigates away before the 5 seconds are up.
     _redirectTimer?.cancel();
     _animationController.dispose();
     super.dispose();
@@ -81,9 +75,7 @@ class _SplashScreenState extends State<SplashScreen>
 
   @override
   Widget build(BuildContext context) {
-    // This line is still important. If the AuthService finishes its check
-    // *before* the 5-second timer, the GoRouter's redirect logic will
-    // navigate away immediately, and the timer will be cancelled in dispose().
+    // This watch call is still crucial for the main auth flow redirection.
     context.watch<AuthService>();
 
     final textTheme = Theme.of(context).textTheme;
@@ -102,7 +94,7 @@ class _SplashScreenState extends State<SplashScreen>
                 child: Column(
                   children: [
                     const Icon(
-                      LucideIcons.house, // Corrected the icon name
+                      LucideIcons.pipette, // Using a more appropriate icon
                       size: 100,
                       color: draculaPurple,
                     ),
@@ -110,16 +102,12 @@ class _SplashScreenState extends State<SplashScreen>
                     Text(
                       'Addis Information Highway',
                       textAlign: TextAlign.center,
-                      style: textTheme.headlineMedium?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
+                      style: textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.bold),
                     ),
                     const SizedBox(height: 12),
                     Text(
                       'Your Data, Your Control.',
-                      style: textTheme.bodyLarge?.copyWith(
-                        color: draculaComment,
-                      ),
+                      style: textTheme.bodyLarge?.copyWith(color: draculaComment),
                     ),
                   ],
                 ),
