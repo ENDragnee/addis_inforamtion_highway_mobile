@@ -75,7 +75,6 @@ class _MyAppState extends State<MyApp> {
           path: '/login',
           builder: (context, state) => const LoginScreen(),
         ),
-        // The '/create-password' route is now REMOVED.
         GoRoute(
           name: 'dashboard',
           path: '/dashboard',

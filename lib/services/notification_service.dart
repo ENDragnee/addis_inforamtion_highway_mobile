@@ -43,7 +43,7 @@ class NotificationService {
 
       // 3. Send this token to your backend
       if (fcmToken != null) {
-        await _apiService.registerPushToken(fcmToken);
+        await _apiService.registerFcmToken(fcmToken);
       }
 
       // 4. Set up listeners for incoming messages

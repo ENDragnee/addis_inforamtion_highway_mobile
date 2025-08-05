@@ -5,6 +5,9 @@ import 'package:addis_information_highway_mobile/features/dashboard/dashboard_co
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
+import  'package:lucide_icons_flutter/lucide_icons.dart';
+
+
 
 class RequestDetailScreen extends StatefulWidget {
   final String requestId;
@@ -34,7 +37,8 @@ class _RequestDetailScreenState extends State<RequestDetailScreen> {
       // If data is already available, create a completed Future instantly.
       _requestFuture = Future.value(DataRequest.fromJson(widget.initialData!));
     } else {
-      // If navigating directly to this screen, fetch the data from the API.
+      // If navigating directly to this screen (e.g., from a push notification),
+      // fetch the data from the API.
       _requestFuture = _fetchRequestDetails();
     }
   }
@@ -42,10 +46,10 @@ class _RequestDetailScreenState extends State<RequestDetailScreen> {
   /// Fetches the details for a single request. This is the fallback.
   Future<DataRequest> _fetchRequestDetails() async {
     try {
-      // This assumes your ApiService has a method to fetch a single request.
-      // If not, you would filter the list from `fetchDataRequests`.
       final allRequests = await context.read<ApiService>().fetchDataRequests();
-      return allRequests.firstWhere((req) => req.id == widget.requestId);
+      // Find the specific request by its ID from the full list.
+      return allRequests.firstWhere((req) => req.id == widget.requestId,
+          orElse: () => throw Exception('Request with ID ${widget.requestId} not found.'));
     } catch (e) {
       // Propagate the error to be handled by the FutureBuilder.
       throw Exception('Failed to load request details.');
@@ -91,18 +95,12 @@ class _RequestDetailScreenState extends State<RequestDetailScreen> {
       body: FutureBuilder<DataRequest>(
         future: _requestFuture,
         builder: (context, snapshot) {
-          // --- State 1: Loading ---
           if (snapshot.connectionState == ConnectionState.waiting) {
             return _buildLoadingState();
           }
-
-          // --- State 2: Error ---
           if (snapshot.hasError) {
             return _buildErrorState(snapshot.error.toString());
           }
-
-          // --- State 3: Success ---
-          // The data is guaranteed to be available here.
           final request = snapshot.data!;
           return _buildContent(context, request);
         },
@@ -117,10 +115,10 @@ class _RequestDetailScreenState extends State<RequestDetailScreen> {
     return SingleChildScrollView(
       padding: const EdgeInsets.all(24.0),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Center(
-            child: Icon(Icons.security_rounded, size: 80, color: draculaPurple),
+          const Center(
+            child: Icon(LucideIcons.shieldCheck, size: 80, color: draculaPurple),
           ),
           const SizedBox(height: 16),
           Center(
@@ -138,35 +136,42 @@ class _RequestDetailScreenState extends State<RequestDetailScreen> {
             'A data sharing request has been made:',
             style: TextStyle(color: draculaComment),
           ),
-          const SizedBox(height: 24),
-          _buildDetailRow(
-            icon: Icons.business_rounded,
-            label: 'Requesting Institution',
-            value: request.requester['name'],
-            valueColor: draculaCyan,
-          ),
-          _buildDetailRow(
-            icon: Icons.source_rounded,
-            label: 'Data Provider',
-            value: request.provider['name'],
-          ),
-          _buildDetailRow(
-            icon: Icons.description_rounded,
-            label: 'Data Requested',
-            value: request.dataSchema['description'],
+          const SizedBox(height: 16),
+
+          // Added a Card for better visual grouping of details.
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Column(
+                children: [
+                  _buildDetailRow(
+                    icon: LucideIcons.building2,
+                    label: 'Requesting Institution',
+                    value: request.requester['name'],
+                    valueColor: draculaCyan,
+                  ),
+                  const Divider(color: draculaCurrentLine),
+                  _buildDetailRow(
+                    icon: LucideIcons.database,
+                    label: 'Data Provider',
+                    value: request.provider['name'],
+                  ),
+                  const Divider(color: draculaCurrentLine),
+                  _buildDetailRow(
+                    icon: LucideIcons.fileText,
+                    label: 'Data Requested',
+                    value: request.dataSchema['description'],
+                  ),
+                ],
+              ),
+            ),
           ),
           const SizedBox(height: 48),
 
           if (isActionable)
             _buildActionButtons()
           else
-            Center(
-              child: Text(
-                'This request has been actioned and is no longer pending.',
-                textAlign: TextAlign.center,
-                style: TextStyle(color: draculaComment, fontStyle: FontStyle.italic),
-              ),
-            ),
+            _buildGoBackButton(), // Show the "Go Back" button for historical items
         ],
       ),
     );
@@ -211,13 +216,13 @@ class _RequestDetailScreenState extends State<RequestDetailScreen> {
   /// A widget for the Approve/Deny action buttons.
   Widget _buildActionButtons() {
     return _isResponding
-        ? const Center(child: CircularProgressIndicator())
+        ? const Center(child: CircularProgressIndicator(color: draculaPink))
         : Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         ElevatedButton.icon(
           onPressed: () => _handleResponse('APPROVE'),
-          icon: const Icon(Icons.check_circle_outline),
+          icon: const Icon(LucideIcons.check),
           label: const Text('Approve'),
           style: ButtonStyle(
             backgroundColor: WidgetStateProperty.all(draculaGreen),
@@ -227,13 +232,40 @@ class _RequestDetailScreenState extends State<RequestDetailScreen> {
         const SizedBox(height: 12),
         ElevatedButton.icon(
           onPressed: () => _handleResponse('DENY'),
-          icon: const Icon(Icons.cancel_outlined),
+          icon: const Icon(LucideIcons.x),
           label: const Text('Deny'),
           style: ButtonStyle(
             backgroundColor: WidgetStateProperty.all(draculaRed),
             padding: WidgetStateProperty.all<EdgeInsets>(const EdgeInsets.symmetric(vertical: 16)),
           ),
         ),
+      ],
+    );
+  }
+
+  /// NEW WIDGET: A button for navigating back to the home/dashboard screen.
+  Widget _buildGoBackButton() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Center(
+          child: Text(
+            'This request has been actioned and is no longer pending.',
+            textAlign: TextAlign.center,
+            style: TextStyle(color: draculaComment, fontStyle: FontStyle.italic),
+          ),
+        ),
+        const SizedBox(height: 24),
+        OutlinedButton.icon(
+          onPressed: () => context.go('/dashboard'), // Navigate to the main dashboard route
+          icon: const Icon(LucideIcons.house),
+          label: const Text('Go Back to Home'),
+          style: OutlinedButton.styleFrom(
+            foregroundColor: draculaComment,
+            side: const BorderSide(color: draculaCurrentLine),
+            padding: const EdgeInsets.symmetric(vertical: 16),
+          ),
+        )
       ],
     );
   }

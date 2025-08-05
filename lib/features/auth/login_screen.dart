@@ -2,6 +2,33 @@ import 'package:addis_information_highway_mobile/services/auth_service.dart';
 import 'package:addis_information_highway_mobile/theme/dracula_theme.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:dio/dio.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
+
+// A simple model for the test user data fetched from the backend.
+class TestUser {
+  final String id;
+  final String name;
+  final String sessionToken;
+  final bool needsFcmTokenSetup;
+
+  TestUser({
+    required this.id,
+    required this.name,
+    required this.sessionToken,
+    required this.needsFcmTokenSetup,
+  });
+
+  factory TestUser.fromJson(Map<String, dynamic> json) {
+    return TestUser(
+      id: json['id'],
+      name: json['name'],
+      sessionToken: json['sessionToken'],
+      needsFcmTokenSetup: json['needsFcmTokenSetup'],
+    );
+  }
+}
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -10,40 +37,50 @@ class LoginScreen extends StatefulWidget {
   State<LoginScreen> createState() => _LoginScreenState();
 }
 
-class _LoginScreenState extends State<LoginScreen>
-    with SingleTickerProviderStateMixin {
-  bool _isLoading = false;
+class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStateMixin {
+  bool _isLoadingOidc = false;
+  // State for the test user feature
+  bool _isLoadingTestUsers = true; // Start in a loading state
+  List<TestUser> _testUsers = [];
+  String? _testUserError;
+
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
-  late Animation<Offset> _slideAnimation;
 
   @override
   void initState() {
     super.initState();
     _animationController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 800),
+      duration: const Duration(milliseconds: 600),
     );
 
-    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(
-        parent: _animationController,
-        curve: Curves.easeIn,
-      ),
-    );
+    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0)
+        .animate(CurvedAnimation(parent: _animationController, curve: Curves.easeIn));
 
-    _slideAnimation = Tween<Offset>(
-      begin: const Offset(0, 0.5),
-      end: Offset.zero,
-    ).animate(
-      CurvedAnimation(
-        parent: _animationController,
-        curve: Curves.easeOutCubic,
-      ),
-    );
-
-    // Start the animation when the screen is first built
     _animationController.forward();
+
+    // REMOVED kDebugMode CHECK: Always fetch the test users.
+    _fetchTestUsers();
+  }
+
+  Future<void> _fetchTestUsers() async {
+    try {
+      final dio = Dio();
+      final response = await dio.get(
+          '${dotenv.env['BFF_BASE_URL']!}/api/v1/mobile/debug/test-users');
+      if (response.statusCode == 200) {
+        final users = (response.data as List)
+            .map((json) => TestUser.fromJson(json))
+            .toList();
+        setState(() => _testUsers = users);
+      }
+    } catch (e) {
+      setState(() => _testUserError = 'Failed to load test users.');
+      print('Error fetching test users: $e');
+    } finally {
+      setState(() => _isLoadingTestUsers = false);
+    }
   }
 
   @override
@@ -52,41 +89,29 @@ class _LoginScreenState extends State<LoginScreen>
     super.dispose();
   }
 
-  Future<void> _handleLogin() async {
-    setState(() {
-      _isLoading = true;
-    });
-
+  Future<void> _handleOidcLogin() async {
+    setState(() => _isLoadingOidc = true);
     try {
-      // The actual logic is now cleanly handled by the AuthService.
-      // This single call will handle the OIDC flow, token exchange,
-      // and new device key registration if needed.
       await context.read<AuthService>().login();
-
-      // GoRouter's redirect logic will handle navigation automatically on success,
-      // as the authState will change to 'authenticated'.
     } catch (e) {
-      // Show an error message if the login process fails
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              'Login failed. Please try again.',
-              style: TextStyle(color: Theme.of(context).colorScheme.onError),
-            ),
-            backgroundColor: Theme.of(context).colorScheme.error,
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('Login failed. Please try again.', style: TextStyle(color: Theme.of(context).colorScheme.onError)),
+          backgroundColor: Theme.of(context).colorScheme.error,
+        ));
       }
     } finally {
-      // Ensure the loading state is always turned off, regardless of outcome
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
-      }
+      if (mounted) setState(() => _isLoadingOidc = false);
     }
+  }
+
+  Future<void> _handleTestUserLogin(TestUser user) async {
+    // We can add a loading state for the specific tile if desired,
+    // but for quick testing, a direct call is often fine.
+    await context.read<AuthService>().debugLogin(
+      sessionToken: user.sessionToken,
+      needsFcmTokenSetup: user.needsFcmTokenSetup,
+    );
   }
 
   @override
@@ -97,81 +122,59 @@ class _LoginScreenState extends State<LoginScreen>
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
-            child: Container(
-              constraints: const BoxConstraints(maxWidth: 400),
-              padding: const EdgeInsets.all(32.0),
-              child: FadeTransition(
-                opacity: _fadeAnimation,
-                child: SlideTransition(
-                  position: _slideAnimation,
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      // Header Section
-                      const Icon(
-                        Icons.gite_rounded,
-                        size: 80,
-                        color: draculaPurple,
-                      ),
-                      const SizedBox(height: 24),
-                      Text(
-                        'Addis Information Highway',
-                        textAlign: TextAlign.center,
-                        style: textTheme.headlineMedium?.copyWith(
-                          fontWeight: FontWeight.bold,
+            padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 48.0),
+            child: FadeTransition(
+              opacity: _fadeAnimation,
+              child: Container(
+                constraints: const BoxConstraints(maxWidth: 450),
+                child: Card(
+                  elevation: 8,
+                  shadowColor: Colors.black.withAlpha(20), // Use withOpacity for consistency
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 32.0),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        // --- Header ---
+                        const Icon(LucideIcons.shieldCheck, size: 48, color: draculaPurple),
+                        const SizedBox(height: 16),
+                        Text(
+                          'Choose an account',
+                          style: textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
                         ),
-                      ),
-                      const SizedBox(height: 12),
-                      Text(
-                        'Your Data, Your Control. Securely sign in to manage your data consent.',
-                        textAlign: TextAlign.center,
-                        style: textTheme.bodyLarge?.copyWith(
-                          color: draculaComment,
+                        const SizedBox(height: 8),
+                        Text(
+                          'to continue to Addis Information Highway',
+                          style: textTheme.bodyMedium?.copyWith(color: draculaComment),
                         ),
-                      ),
-                      const SizedBox(height: 64),
+                        const SizedBox(height: 24),
+                        const Divider(color: draculaCurrentLine),
 
-                      // Login Button Section
-                      ElevatedButton.icon(
-                        onPressed: _isLoading ? null : _handleLogin,
-                        icon: _isLoading
-                            ? Container(
-                          width: 24,
-                          height: 24,
-                          padding: const EdgeInsets.all(2.0),
-                          child: const CircularProgressIndicator(
-                            strokeWidth: 3,
-                            color: draculaBackground,
-                          ),
-                        )
-                            : const Icon(Icons.lock_open_rounded, size: 20),
-                        label: Text(
-                          _isLoading ? 'Connecting...' : 'Sign In with VeriFayda',
-                          style: textTheme.labelLarge?.copyWith(fontSize: 16),
-                        ),
-                        style: ButtonStyle(
-                          padding: WidgetStateProperty.all<EdgeInsets>(
-                            const EdgeInsets.symmetric(vertical: 18),
-                          ),
-                          backgroundColor: WidgetStateProperty.all(draculaGreen),
-                          shape: WidgetStateProperty.all<RoundedRectangleBorder>(
-                            RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12.0),
-                            ),
-                          ),
-                          elevation: WidgetStateProperty.all(5),
-                        ),
-                      ),
-                      const SizedBox(height: 120),
+                        // --- Test User List (Now always visible) ---
+                        // REMOVED kDebugMode CHECK: This section will now always build.
+                        _buildTestUserSection(),
 
-                      // Footer Section
-                      Text(
-                        'Powered by ASCII Technologies',
-                        textAlign: TextAlign.center,
-                        style: textTheme.bodySmall?.copyWith(fontSize: 12),
-                      ),
-                    ],
+                        // --- Main Login Action ---
+                        ListTile(
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
+                          leading: _isLoadingOidc
+                              ? const SizedBox(
+                            width: 40,
+                            height: 40,
+                            child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
+                          )
+                              : const CircleAvatar(
+                            backgroundColor: draculaCurrentLine,
+                            child: Icon(LucideIcons.keyRound, color: draculaCyan),
+                          ),
+                          title: Text('Sign In with VeriFayda', style: textTheme.titleMedium),
+                          subtitle: Text('Use the official secure login', style: textTheme.bodySmall),
+                          onTap: _isLoadingOidc ? null : _handleOidcLogin,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                          hoverColor: draculaPink.withAlpha(10), // Use withOpacity for consistency
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ),
@@ -179,6 +182,52 @@ class _LoginScreenState extends State<LoginScreen>
           ),
         ),
       ),
+    );
+  }
+
+  /// A helper widget to build the test user section, keeping the main build method clean.
+  Widget _buildTestUserSection() {
+    if (_isLoadingTestUsers) {
+      return const Padding(
+        padding: EdgeInsets.symmetric(vertical: 40.0),
+        child: Center(child: CircularProgressIndicator(color: draculaComment)),
+      );
+    }
+    if (_testUserError != null) {
+      return Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Text(_testUserError!, style: const TextStyle(color: draculaRed), textAlign: TextAlign.center),
+      );
+    }
+    if (_testUsers.isEmpty) {
+      // Show an informative message instead of nothing.
+      return const Padding(
+        padding: EdgeInsets.symmetric(vertical: 24.0),
+        child: Center(child: Text("No test users found.", style: TextStyle(color: draculaComment))),
+      );
+    }
+
+    // Use ListView.separated for clean dividers
+    return ListView.separated(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      itemCount: _testUsers.length,
+      itemBuilder: (context, index) {
+        final user = _testUsers[index];
+        return ListTile(
+          contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+          leading: const CircleAvatar(
+            backgroundColor: draculaCurrentLine,
+            child: Icon(LucideIcons.user, color: draculaComment),
+          ),
+          title: Text(user.name, style: Theme.of(context).textTheme.titleMedium),
+          subtitle: Text('Test Account', style: Theme.of(context).textTheme.bodySmall),
+          onTap: () => _handleTestUserLogin(user),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+          hoverColor: draculaPink.withAlpha(10),
+        );
+      },
+      separatorBuilder: (context, index) => const Divider(color: draculaCurrentLine, height: 1),
     );
   }
 }

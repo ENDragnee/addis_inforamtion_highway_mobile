@@ -87,7 +87,7 @@ class AuthService extends ChangeNotifier {
   Future<void> _exchangeCodeWithBackend(String code, String verifier) async {
     try {
       final response = await _dio.post(
-        '$_bffBaseUrl/v1/api/mobile/auth/token',
+        '$_bffBaseUrl/api/v1/mobile/auth/token',
         data: {
           'authorizationCode': code,
           'codeVerifier': verifier,
@@ -117,23 +117,38 @@ class AuthService extends ChangeNotifier {
     }
   }
 
-  /// NEW METHOD: Replaces the key generation logic with FCM token registration.
+  Future<void> debugLogin({
+    required String sessionToken,
+    required bool needsFcmTokenSetup,
+  }) async {
+    print("AuthService: Performing DEBUG login.");
+    _appSessionToken = sessionToken;
+    await _secureStorage.write(key: 'app_session_token', value: _appSessionToken);
+
+    // If the test user doesn't have an FCM token, register one.
+    if (needsFcmTokenSetup) {
+      await _registerDeviceForPushNotifications();
+    }
+
+    // Set the state to authenticated and notify listeners to trigger redirect.
+    _authState = AuthState.authenticated;
+    notifyListeners();
+  }
+
   Future<void> _registerDeviceForPushNotifications() async {
     print("AuthService: Registering device for push notifications...");
     try {
-      // 1. Request permission from the user for notifications
       NotificationSettings settings = await _fcm.requestPermission();
 
       if (settings.authorizationStatus == AuthorizationStatus.authorized) {
-        // 2. Get the device's unique FCM token
         final String? fcmToken = await _fcm.getToken();
 
         if (fcmToken != null) {
           print("AuthService: Got FCM Token, sending to backend.");
-          // 3. Send this token to your backend to associate it with the logged-in user
+          // UPDATED: The API call now goes to the new endpoint and uses the correct key.
           await _dio.post(
-            '$_bffBaseUrl/v1/api/mobile/users/register-push-token',
-            data: { 'token': fcmToken },
+            '$_bffBaseUrl/api/v1/mobile/users/register-fcm-token',
+            data: { 'fcmToken': fcmToken }, // Use the 'fcmToken' key
             options: Options(headers: {'Authorization': 'Bearer $_appSessionToken'}),
           );
           print("AuthService: FCM Token registration complete.");
@@ -144,8 +159,6 @@ class AuthService extends ChangeNotifier {
         print("AuthService: User did not grant notification permission.");
       }
     } catch (e) {
-      // Log the error but don't crash the login flow.
-      // The user can still use the app, they just won't get notifications.
       print("AuthService: Error during push notification setup: $e");
     }
   }

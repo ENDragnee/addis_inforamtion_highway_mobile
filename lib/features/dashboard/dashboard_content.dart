@@ -4,6 +4,7 @@ import 'package:addis_information_highway_mobile/theme/dracula_theme.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
+import  'package:lucide_icons_flutter/lucide_icons.dart';
 
 class DashboardContent extends StatefulWidget {
   const DashboardContent({super.key});
@@ -18,12 +19,26 @@ class _DashboardContentState extends State<DashboardContent> {
   @override
   void initState() {
     super.initState();
-    _requestsFuture = context.read<ApiService>().fetchDataRequests();
+    // Fetch the initial data when the widget is first created.
+    _requestsFuture = _fetchData();
   }
 
-  void _refreshRequests() {
+  // Helper function to fetch data from the ApiService.
+  Future<List<DataRequest>> _fetchData() {
+    // We use `mounted` check to prevent errors if the widget is disposed
+    // while the async operation is in flight.
+    if (mounted) {
+      return context.read<ApiService>().fetchDataRequests();
+    }
+    return Future.value([]); // Return an empty list if not mounted
+  }
+
+  // This method is called by the pull-to-refresh indicator and
+  // after returning from the detail screen.
+  Future<void> _refreshRequests() async {
+    // This triggers the FutureBuilder to re-run with the new Future.
     setState(() {
-      _requestsFuture = context.read<ApiService>().fetchDataRequests();
+      _requestsFuture = _fetchData();
     });
   }
 
@@ -32,25 +47,51 @@ class _DashboardContentState extends State<DashboardContent> {
     return FutureBuilder<List<DataRequest>>(
       future: _requestsFuture,
       builder: (context, snapshot) {
+        // --- 1. Loading State ---
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator());
+          return const Center(child: CircularProgressIndicator(color: draculaPink));
         }
+
+        // --- 2. Error State ---
         if (snapshot.hasError) {
-          return Center(child: Text('Error: ${snapshot.error}'));
+          return Center(
+              child: Padding(
+                padding: const EdgeInsets.all(32.0),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(LucideIcons.serverCrash, color: draculaRed, size: 60),
+                    const SizedBox(height: 16),
+                    Text('Failed to load requests', style: Theme.of(context).textTheme.titleLarge),
+                    const SizedBox(height: 8),
+                    Text(snapshot.error.toString(), style: const TextStyle(color: draculaComment), textAlign: TextAlign.center),
+                    const SizedBox(height: 24),
+                    ElevatedButton.icon(
+                      onPressed: _refreshRequests,
+                      icon: const Icon(LucideIcons.refreshCw),
+                      label: const Text('Try Again'),
+                    ),
+                  ],
+                ),
+              )
+          );
         }
-        if (!snapshot.hasData || snapshot.data!.isEmpty) {
-          return const Center(child: Text('No data requests found.'));
+
+        // --- 3. Empty & Success States ---
+        if (!snapshot.hasData) {
+          return const Center(child: Text('No data available.'));
         }
 
         final allRequests = snapshot.data!;
         final pendingRequests = allRequests.where((r) => r.status == 'AWAITING_CONSENT').toList();
 
+        // --- 3a. Success State (No Pending Requests) ---
         if (pendingRequests.isEmpty) {
           return Center(
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                const Icon(Icons.check_circle_outline_rounded, size: 80, color: draculaGreen),
+                const Icon(LucideIcons.checkCheck, size: 80, color: draculaGreen),
                 const SizedBox(height: 16),
                 Text('All Caught Up!', style: Theme.of(context).textTheme.headlineSmall),
                 const SizedBox(height: 8),
@@ -60,12 +101,16 @@ class _DashboardContentState extends State<DashboardContent> {
           );
         }
 
+        // --- 3b. Success State (With Pending Requests) ---
+        // The RefreshIndicator widget wraps the scrollable list.
         return RefreshIndicator(
-          onRefresh: () async => _refreshRequests(),
+          onRefresh: _refreshRequests, // This is the magic line
+          color: draculaPink,
+          backgroundColor: draculaCurrentLine,
           child: ListView(
             padding: const EdgeInsets.all(16.0),
             children: [
-              Text('Pending Requests', style: Theme.of(context).textTheme.headlineSmall),
+              Text('Pending Requests (${pendingRequests.length})', style: Theme.of(context).textTheme.headlineSmall),
               const SizedBox(height: 16),
               ...pendingRequests.map((req) => RequestCard(
                 request: req,

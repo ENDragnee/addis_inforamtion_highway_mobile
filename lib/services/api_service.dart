@@ -18,18 +18,15 @@ class ApiService {
 
   /// Registers the device's unique push token with the backend.
   /// This is called by the AuthService during the initial login for a new device.
-  Future<void> registerPushToken(String token) async {
+  Future<void> registerFcmToken(String token) async {
     try {
-      // Corrected API Path
       await _dio.post(
-        '$_baseUrl/api/v1/mobile/users/register-push-token',
-        data: {'token': token},
+        '$_baseUrl/api/v1/mobile/users/register-fcm-token',
+        data: {'fcmToken': token},
       );
-      print('ApiService: Push token registered successfully with backend.');
+      print('ApiService: FCM token registered successfully with backend.');
     } on DioException catch (e) {
-      // Don't throw a fatal error that would crash the login flow.
-      // The user can still use the app without notifications. Just log the error.
-      print('ApiService: Failed to register push token: ${_handleDioError(e, "Unknown error")}');
+      print('ApiService: Failed to register FCM token: ${_handleDioError(e, "Unknown error")}');
     }
   }
 
@@ -37,7 +34,7 @@ class ApiService {
   Future<List<DataRequest>> fetchDataRequests() async {
     try {
       // Corrected API Path
-      final response = await _dio.get('$_baseUrl/v1/api/mobile/requests');
+      final response = await _dio.get('$_baseUrl/api/v1/mobile/requests');
       return (response.data as List)
           .map((json) => DataRequest.fromJson(json))
           .toList();
@@ -55,7 +52,7 @@ class ApiService {
       // UPDATED AND SIMPLIFIED: The `consentToken` is no longer needed.
       // We only send the action.
       final response = await _dio.post(
-        '$_baseUrl/v1/api/mobile/requests/$requestId/respond',
+        '$_baseUrl/api/v1/mobile/requests/$requestId/respond',
         data: {
           'action': action,
         },

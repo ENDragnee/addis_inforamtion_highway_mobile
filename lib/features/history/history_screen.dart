@@ -19,12 +19,20 @@ class _HistoryScreenState extends State<HistoryScreen> {
   @override
   void initState() {
     super.initState();
-    _requestsFuture = context.read<ApiService>().fetchDataRequests();
+    _requestsFuture = _fetchData();
   }
 
-  void _refreshHistory() {
+  Future<List<DataRequest>> _fetchData() {
+    if (mounted) {
+      return context.read<ApiService>().fetchDataRequests();
+    }
+    return Future.value([]);
+  }
+
+  // This method is now called by the RefreshIndicator
+  Future<void> _refreshHistory() async {
     setState(() {
-      _requestsFuture = context.read<ApiService>().fetchDataRequests();
+      _requestsFuture = _fetchData();
     });
   }
 
@@ -34,24 +42,35 @@ class _HistoryScreenState extends State<HistoryScreen> {
       future: _requestsFuture,
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator());
+          return const Center(child: CircularProgressIndicator(color: draculaPink));
         }
         if (snapshot.hasError) {
+          // You can create a more specific error widget if you like
           return Center(child: Text('Error: ${snapshot.error}'));
         }
-        if (!snapshot.hasData || snapshot.data!.isEmpty) {
-          return const Center(child: Text('No data requests found.'));
+        if (!snapshot.hasData) {
+          return const Center(child: Text('No data available.'));
         }
 
         // Filter for historical requests only
-        final historicalRequests = snapshot.data!.where((r) => r.status != 'AWAITING_CONSENT').toList();
+        final historicalRequests = snapshot.data!
+            .where((r) => r.status != 'AWAITING_CONSENT')
+            .toList();
 
         if (historicalRequests.isEmpty) {
-          return const Center(child: Text('Your request history is empty.', style: TextStyle(color: draculaComment)));
+          return const Center(
+            child: Text(
+              'Your request history is empty.',
+              style: TextStyle(color: draculaComment),
+            ),
+          );
         }
 
+        // ADDED: Wrap the ListView.builder with a RefreshIndicator
         return RefreshIndicator(
-          onRefresh: () async => _refreshHistory(),
+          onRefresh: _refreshHistory,
+          color: draculaPink,
+          backgroundColor: draculaCurrentLine,
           child: ListView.builder(
             padding: const EdgeInsets.all(16.0),
             itemCount: historicalRequests.length,
@@ -59,11 +78,13 @@ class _HistoryScreenState extends State<HistoryScreen> {
               final req = historicalRequests[index];
               return RequestCard(
                 request: req,
-                onTap: () {
-                  context.goNamed('request-detail',
+                onTap: () async {
+                   context.goNamed('request-detail',
                     pathParameters: {'id': req.id},
                     extra: req.toJson(),
                   );
+                  // Refreshing after viewing a historical item is optional, but good practice
+                  _refreshHistory();
                 },
               );
             },
